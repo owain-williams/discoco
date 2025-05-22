@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { NavigationAction } from "./navigation-action";
 import { NavigationItem } from "./navigation-item";
+import { UserPanel } from "./user-panel";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -18,11 +19,11 @@ export const NavigationSidebar = async () => {
       members: {
         some: {
           user: {
-            clerkId: user.id
-          }
-        }
-      }
-    }
+            clerkId: user.id,
+          },
+        },
+      },
+    },
   });
 
   return (
@@ -40,6 +41,9 @@ export const NavigationSidebar = async () => {
           </div>
         ))}
       </ScrollArea>
+      <div className="w-full">
+        <UserPanel />
+      </div>
     </div>
   );
 };

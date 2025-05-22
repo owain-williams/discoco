@@ -15,6 +15,8 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useSocket } from "@/components/providers/socket-provider";
 import { VoiceManager } from "@/lib/voice-manager";
+import { AudioDeviceManager } from "@/lib/audio-device-manager";
+import { useModal } from "@/hooks/use-modal-store";
 import { cn } from "@/lib/utils";
 
 interface VoiceChannelProps {
@@ -40,6 +42,7 @@ export const VoiceChannel = ({
   serverId,
 }: VoiceChannelProps) => {
   const { socket } = useSocket();
+  const { onOpen } = useModal();
   const [isConnected, setIsConnected] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [isDeafened, setIsDeafened] = useState(false);
@@ -47,14 +50,19 @@ export const VoiceChannel = ({
   const [mediaStream, setMediaStream] = useState<MediaStream | null>(null);
   const voiceManagerRef = useRef<VoiceManager | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioDeviceManager = AudioDeviceManager.getInstance();
 
   // Connect to voice channel
   const connectToVoice = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: true,
-        video: false,
-      });
+      // Use selected microphone or default
+      const selectedMic = audioDeviceManager.getSelectedMicrophone();
+      const stream = selectedMic
+        ? await audioDeviceManager.getMicrophoneStream(selectedMic)
+        : await navigator.mediaDevices.getUserMedia({
+            audio: true,
+            video: false,
+          });
       setMediaStream(stream);
       setIsConnected(true);
 
@@ -310,6 +318,7 @@ export const VoiceChannel = ({
             </Button>
 
             <Button
+              onClick={() => onOpen("settings")}
               size="icon"
               variant="ghost"
               className="w-10 h-10 rounded-full"

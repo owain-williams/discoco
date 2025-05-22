@@ -4,9 +4,8 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 
-const MESSAGES_BATCH = 10;
-
-interface Message {
+// Interface for message data structure (for future use)
+export interface Message {
   id: string;
   content: string;
   fileUrl?: string;
@@ -26,7 +25,6 @@ interface Message {
 const fetchMessages = async ({
   pageParam = undefined,
   chatId,
-  apiUrl,
 }: {
   pageParam?: string;
   chatId: string;
@@ -70,9 +68,6 @@ const sendMessage = async ({
 
 export const useMessages = ({
   chatId,
-  apiUrl,
-  paramKey,
-  paramValue,
 }: {
   chatId: string;
   apiUrl: string;
@@ -81,7 +76,8 @@ export const useMessages = ({
 }) => {
   return useInfiniteQuery({
     queryKey: ["messages", chatId],
-    queryFn: ({ pageParam }) => fetchMessages({ pageParam, chatId, apiUrl }),
+    queryFn: ({ pageParam }) =>
+      fetchMessages({ pageParam, chatId, apiUrl: "" }),
     getNextPageParam: (lastPage) => lastPage?.nextCursor,
     refetchInterval: 1000, // Refetch every second for real-time effect
     enabled: !!chatId,

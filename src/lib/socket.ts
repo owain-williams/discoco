@@ -1,14 +1,14 @@
 import { Server as NetServer } from "http";
-import { NextApiRequest } from "next";
 import { Server as ServerIO } from "socket.io";
+import { NextApiResponse } from "next";
 
-export type NextApiResponseServerIO = {
+export type NextApiResponseServerIO = NextApiResponse & {
   socket: {
     server: NetServer & {
       io: ServerIO;
     };
   };
-} & any;
+};
 
 export const config = {
   api: {
