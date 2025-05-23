@@ -40,7 +40,7 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
           reconnection: true,
           reconnectionDelay: 2000,
           reconnectionDelayMax: 10000,
-          maxReconnectionAttempts: 3,
+          reconnectionAttempts: 3,
           forceNew: false,
           upgrade: true,
           rememberUpgrade: true,
@@ -53,7 +53,7 @@ export const SocketProvider = ({ children }: { children: React.ReactNode }) => {
           "✅ Socket transport:",
           socketInstance.io.engine.transport.name
         );
-        console.log("✅ Socket URL:", socketInstance.io.uri);
+        console.log("✅ Socket connected to server");
         setIsConnected(true);
       });
 

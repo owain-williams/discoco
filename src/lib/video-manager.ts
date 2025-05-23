@@ -229,8 +229,8 @@ export class VideoManager {
         videoElement.style.height = "100%";
         videoElement.style.objectFit = "cover";
 
-        // Append to a designated container (will be managed by React components)
-        const container = document.getElementById("video-grid-container");
+        // Append to the specific user's React container
+        const container = document.getElementById(`video-container-${userId}`);
         if (container) {
           container.appendChild(videoElement);
         }
