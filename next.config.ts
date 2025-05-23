@@ -16,7 +16,6 @@ const nextConfig: NextConfig = {
   eslint: {
     ignoreDuringBuilds: false,
   },
-  outputFileTracing: true,
 };
 
 export default nextConfig;
