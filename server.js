@@ -81,7 +81,7 @@ app.prepare().then(() => {
       socket.voiceUser = null;
     });
 
-        socket.on("voice-state-update", (data) => {
+    socket.on("voice-state-update", (data) => {
       const { channelId, userId, isMuted, isDeafened } = data;
       const voiceRoomKey = `voice:${channelId}`;
 
@@ -99,6 +99,71 @@ app.prepare().then(() => {
       });
     });
 
+    // Video channel events
+    socket.on("join-video-channel", (data) => {
+      const { channelId, serverId, user } = data;
+      const videoRoomKey = `video:${channelId}`;
+
+      socket.join(videoRoomKey);
+      socket.videoChannelId = channelId;
+      socket.videoUserId = user.id;
+
+      console.log(`Socket ${socket.id} joined video channel ${channelId}`);
+
+      // Notify others in the video channel
+      socket.to(videoRoomKey).emit("video-user-joined", user);
+
+      // Send current video users to the newly joined user
+      const videoUsers = [];
+      const roomSockets = io.sockets.adapter.rooms.get(videoRoomKey);
+      if (roomSockets) {
+        roomSockets.forEach((socketId) => {
+          const roomSocket = io.sockets.sockets.get(socketId);
+          if (roomSocket && roomSocket.videoUser && socketId !== socket.id) {
+            videoUsers.push(roomSocket.videoUser);
+          }
+        });
+      }
+
+      socket.videoUser = user;
+      socket.emit("video-channel-users", videoUsers);
+    });
+
+    socket.on("leave-video-channel", (data) => {
+      const { channelId, userId } = data;
+      const videoRoomKey = `video:${channelId}`;
+
+      socket.leave(videoRoomKey);
+      console.log(`Socket ${socket.id} left video channel ${channelId}`);
+
+      // Notify others in the video channel
+      socket.to(videoRoomKey).emit("video-user-left", userId);
+
+      socket.videoChannelId = null;
+      socket.videoUserId = null;
+      socket.videoUser = null;
+    });
+
+    socket.on("video-state-update", (data) => {
+      const { channelId, userId, isMuted, isDeafened, hasVideo } = data;
+      const videoRoomKey = `video:${channelId}`;
+
+      // Update socket's video user state
+      if (socket.videoUser) {
+        socket.videoUser.isMuted = isMuted;
+        socket.videoUser.isDeafened = isDeafened;
+        socket.videoUser.hasVideo = hasVideo;
+      }
+
+      // Broadcast state update to others in the video channel
+      socket.to(videoRoomKey).emit("video-state-update", {
+        userId,
+        isMuted,
+        isDeafened,
+        hasVideo,
+      });
+    });
+
     // WebRTC signaling events
     socket.on("join-voice-channel-webrtc", (data) => {
       const { channelId, userId } = data;
@@ -112,6 +177,18 @@ app.prepare().then(() => {
       socket.to(voiceRoomKey).emit("voice-user-joined", { userId });
     });
 
+    socket.on("join-video-channel-webrtc", (data) => {
+      const { channelId, userId, hasVideo } = data;
+      const videoRoomKey = `video:${channelId}`;
+
+      socket.join(videoRoomKey);
+      socket.videoChannelId = channelId;
+      socket.videoUserId = userId;
+
+      // Notify others about new user for WebRTC connections
+      socket.to(videoRoomKey).emit("video-user-joined", { userId, hasVideo });
+    });
+
     socket.on("leave-voice-channel-webrtc", (data) => {
       const { channelId, userId } = data;
       const voiceRoomKey = `voice:${channelId}`;
@@ -121,6 +198,17 @@ app.prepare().then(() => {
 
       socket.voiceChannelId = null;
       socket.voiceUserId = null;
+    });
+
+    socket.on("leave-video-channel-webrtc", (data) => {
+      const { channelId, userId } = data;
+      const videoRoomKey = `video:${channelId}`;
+
+      socket.leave(videoRoomKey);
+      socket.to(videoRoomKey).emit("video-user-left", { userId });
+
+      socket.videoChannelId = null;
+      socket.videoUserId = null;
     });
 
     socket.on("voice-offer", (data) => {
@@ -180,6 +268,65 @@ app.prepare().then(() => {
       }
     });
 
+    // Video WebRTC signaling events
+    socket.on("video-offer", (data) => {
+      const { targetUserId, signal, channelId, hasVideo } = data;
+      const videoRoomKey = `video:${channelId}`;
+
+      // Find target socket and send offer
+      const roomSockets = io.sockets.adapter.rooms.get(videoRoomKey);
+      if (roomSockets) {
+        roomSockets.forEach((socketId) => {
+          const roomSocket = io.sockets.sockets.get(socketId);
+          if (roomSocket && roomSocket.videoUserId === targetUserId) {
+            roomSocket.emit("video-offer", {
+              userId: socket.videoUserId,
+              signal,
+              hasVideo,
+            });
+          }
+        });
+      }
+    });
+
+    socket.on("video-answer", (data) => {
+      const { targetUserId, signal, channelId } = data;
+      const videoRoomKey = `video:${channelId}`;
+
+      // Find target socket and send answer
+      const roomSockets = io.sockets.adapter.rooms.get(videoRoomKey);
+      if (roomSockets) {
+        roomSockets.forEach((socketId) => {
+          const roomSocket = io.sockets.sockets.get(socketId);
+          if (roomSocket && roomSocket.videoUserId === targetUserId) {
+            roomSocket.emit("video-answer", {
+              userId: socket.videoUserId,
+              signal,
+            });
+          }
+        });
+      }
+    });
+
+    socket.on("video-ice-candidate", (data) => {
+      const { targetUserId, signal, channelId } = data;
+      const videoRoomKey = `video:${channelId}`;
+
+      // Find target socket and send ICE candidate
+      const roomSockets = io.sockets.adapter.rooms.get(videoRoomKey);
+      if (roomSockets) {
+        roomSockets.forEach((socketId) => {
+          const roomSocket = io.sockets.sockets.get(socketId);
+          if (roomSocket && roomSocket.videoUserId === targetUserId) {
+            roomSocket.emit("video-ice-candidate", {
+              userId: socket.videoUserId,
+              signal,
+            });
+          }
+        });
+      }
+    });
+
     socket.on("disconnect", () => {
       console.log("Socket disconnected:", socket.id);
 
@@ -187,6 +334,12 @@ app.prepare().then(() => {
       if (socket.voiceChannelId && socket.voiceUserId) {
         const voiceRoomKey = `voice:${socket.voiceChannelId}`;
         socket.to(voiceRoomKey).emit("voice-user-left", socket.voiceUserId);
+      }
+
+      // Handle video channel cleanup
+      if (socket.videoChannelId && socket.videoUserId) {
+        const videoRoomKey = `video:${socket.videoChannelId}`;
+        socket.to(videoRoomKey).emit("video-user-left", socket.videoUserId);
       }
     });
   });

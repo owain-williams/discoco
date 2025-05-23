@@ -6,6 +6,7 @@ import { ChatHeader } from "@/components/chat/chat-header";
 import { ChatInput } from "@/components/chat/chat-input";
 import { ChatMessages } from "@/components/chat/chat-messages";
 import { VoiceChannel } from "@/components/voice/voice-channel";
+import { VideoChannel } from "@/components/voice/video-channel";
 
 interface ChannelIdPageProps {
   params: {
@@ -48,6 +49,20 @@ const ChannelIdPage = async ({ params }: ChannelIdPageProps) => {
     return (
       <div className="bg-white dark:bg-[#313338] flex flex-col h-full">
         <VoiceChannel
+          channelId={channel.id}
+          channelName={channel.name}
+          currentMember={member}
+          serverId={channel.serverId}
+        />
+      </div>
+    );
+  }
+
+  // Check if this is a video channel
+  if (channel.type === ChannelType.VIDEO) {
+    return (
+      <div className="bg-white dark:bg-[#313338] flex flex-col h-full">
+        <VideoChannel
           channelId={channel.id}
           channelName={channel.name}
           currentMember={member}

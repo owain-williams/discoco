@@ -4,11 +4,19 @@ export interface AudioDevice {
   kind: "audioinput" | "audiooutput";
 }
 
+export interface VideoDevice {
+  deviceId: string;
+  label: string;
+  kind: "videoinput";
+}
+
 export class AudioDeviceManager {
   private static instance: AudioDeviceManager;
   private devices: AudioDevice[] = [];
+  private videoDevices: VideoDevice[] = [];
   private selectedMicrophoneId: string | null = null;
   private selectedSpeakerId: string | null = null;
+  private selectedCameraId: string | null = null;
 
   constructor() {
     this.loadSavedDevices();
@@ -24,10 +32,11 @@ export class AudioDeviceManager {
   async getAvailableDevices(): Promise<{
     microphones: AudioDevice[];
     speakers: AudioDevice[];
+    cameras: VideoDevice[];
   }> {
     try {
       // Request permissions first to get device labels
-      await navigator.mediaDevices.getUserMedia({ audio: true });
+      await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
 
       const devices = await navigator.mediaDevices.enumerateDevices();
 
@@ -47,12 +56,21 @@ export class AudioDeviceManager {
           kind: "audiooutput" as const,
         }));
 
-      this.devices = [...microphones, ...speakers];
+      const cameras: VideoDevice[] = devices
+        .filter((device) => device.kind === "videoinput")
+        .map((device) => ({
+          deviceId: device.deviceId,
+          label: device.label || `Camera ${device.deviceId.slice(0, 4)}`,
+          kind: "videoinput" as const,
+        }));
 
-      return { microphones, speakers };
+      this.devices = [...microphones, ...speakers];
+      this.videoDevices = cameras;
+
+      return { microphones, speakers, cameras };
     } catch (error) {
-      console.error("Error getting audio devices:", error);
-      return { microphones: [], speakers: [] };
+      console.error("Error getting audio/video devices:", error);
+      return { microphones: [], speakers: [], cameras: [] };
     }
   }
 
@@ -81,12 +99,21 @@ export class AudioDeviceManager {
     localStorage.setItem("selected-speaker", deviceId);
   }
 
+  setSelectedCamera(deviceId: string) {
+    this.selectedCameraId = deviceId;
+    localStorage.setItem("selected-camera", deviceId);
+  }
+
   getSelectedMicrophone(): string | null {
     return this.selectedMicrophoneId;
   }
 
   getSelectedSpeaker(): string | null {
     return this.selectedSpeakerId;
+  }
+
+  getSelectedCamera(): string | null {
+    return this.selectedCameraId;
   }
 
   async setSpeakerForAudioElement(
@@ -115,6 +142,7 @@ export class AudioDeviceManager {
   private loadSavedDevices() {
     this.selectedMicrophoneId = localStorage.getItem("selected-microphone");
     this.selectedSpeakerId = localStorage.getItem("selected-speaker");
+    this.selectedCameraId = localStorage.getItem("selected-camera");
   }
 
   // Test audio functionality
@@ -211,6 +239,67 @@ export class AudioDeviceManager {
     } catch (error) {
       console.error("Error getting volume level:", error);
       return 0;
+    }
+  }
+
+  // Get camera stream
+  async getCameraStream(deviceId?: string): Promise<MediaStream> {
+    const constraints: MediaStreamConstraints = {
+      audio: false,
+      video: deviceId ? { deviceId: { exact: deviceId } } : true,
+    };
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      return stream;
+    } catch (error) {
+      console.error("Error getting camera stream:", error);
+      throw error;
+    }
+  }
+
+  // Get combined audio/video stream
+  async getAudioVideoStream(
+    audioDeviceId?: string,
+    videoDeviceId?: string
+  ): Promise<MediaStream> {
+    const constraints: MediaStreamConstraints = {
+      audio: audioDeviceId ? { deviceId: { exact: audioDeviceId } } : true,
+      video: videoDeviceId ? { deviceId: { exact: videoDeviceId } } : true,
+    };
+
+    console.log("getAudioVideoStream constraints:", constraints);
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      console.log("getAudioVideoStream result:", stream);
+      console.log("Audio tracks:", stream.getAudioTracks());
+      console.log("Video tracks:", stream.getVideoTracks());
+      return stream;
+    } catch (error) {
+      console.error("Error getting audio/video stream:", error);
+      throw error;
+    }
+  }
+
+  // Test camera functionality
+  async testCamera(deviceId: string): Promise<boolean> {
+    try {
+      const stream = await this.getCameraStream(deviceId);
+      const videoTrack = stream.getVideoTracks()[0];
+
+      if (videoTrack && videoTrack.readyState === "live") {
+        // Clean up
+        stream.getTracks().forEach((track) => track.stop());
+        return true;
+      }
+
+      // Clean up
+      stream.getTracks().forEach((track) => track.stop());
+      return false;
+    } catch (error) {
+      console.error("Error testing camera:", error);
+      return false;
     }
   }
 }
