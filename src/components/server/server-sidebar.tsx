@@ -1,10 +1,8 @@
 import { currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
-import { Hash, Mic, Video, Volume2 } from "lucide-react";
 import { db } from "@/lib/db";
-import { ChannelType, MemberRole } from "@/generated/prisma";
+import { ChannelType } from "@/generated/prisma";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
 import { ServerHeader } from "./server-header";
 import { ServerSection } from "./server-section";
 import { ServerChannel } from "./server-channel";
@@ -13,18 +11,6 @@ import { ServerMember } from "./server-member";
 interface ServerSidebarProps {
   serverId: string;
 }
-
-const iconMap = {
-  [ChannelType.TEXT]: <Hash className="mr-2 h-4 w-4" />,
-  [ChannelType.AUDIO]: <Mic className="mr-2 h-4 w-4" />,
-  [ChannelType.VIDEO]: <Video className="mr-2 h-4 w-4" />,
-};
-
-const roleIconMap = {
-  [MemberRole.GUEST]: null,
-  [MemberRole.MODERATOR]: <Volume2 className="h-4 w-4 mr-2 text-indigo-500" />,
-  [MemberRole.ADMIN]: <Volume2 className="h-4 w-4 mr-2 text-rose-500" />,
-};
 
 export const ServerSidebar = async ({ serverId }: ServerSidebarProps) => {
   const user = await currentUser();
@@ -94,7 +80,6 @@ export const ServerSidebar = async ({ serverId }: ServerSidebarProps) => {
                     key={channel.id}
                     channel={channel}
                     role={role}
-                    server={server}
                   />
                 ))}
               </div>
@@ -114,7 +99,6 @@ export const ServerSidebar = async ({ serverId }: ServerSidebarProps) => {
                     key={channel.id}
                     channel={channel}
                     role={role}
-                    server={server}
                   />
                 ))}
               </div>
@@ -134,7 +118,6 @@ export const ServerSidebar = async ({ serverId }: ServerSidebarProps) => {
                     key={channel.id}
                     channel={channel}
                     role={role}
-                    server={server}
                   />
                 ))}
               </div>
@@ -146,15 +129,10 @@ export const ServerSidebar = async ({ serverId }: ServerSidebarProps) => {
                 sectionType="members"
                 role={role}
                 label="Members"
-                server={server}
               />
               <div className="space-y-[2px]">
                 {members.map((member) => (
-                  <ServerMember
-                    key={member.id}
-                    member={member}
-                    server={server}
-                  />
+                  <ServerMember key={member.id} member={member} />
                 ))}
               </div>
             </div>

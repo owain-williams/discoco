@@ -1,12 +1,12 @@
 "use client";
 
-import { Fragment, useRef, ElementRef, useEffect } from "react";
+import { useRef, ElementRef, useEffect } from "react";
 import { format } from "date-fns";
 import { Loader2, ServerCrash } from "lucide-react";
-import { Member, Message, User } from "@/generated/prisma";
+import { Member } from "@/generated/prisma";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { useMessages } from "@/hooks/use-messages";
+import { useMessages, MessageWithUser } from "@/hooks/use-messages";
 import { useSocket } from "@/components/providers/socket-provider";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -24,17 +24,10 @@ interface ChatMessagesProps {
   type: "channel" | "conversation";
 }
 
-type MessageWithUser = Message & {
-  user: User;
-};
-
 export const ChatMessages = ({
   name,
-  member,
   chatId,
   apiUrl,
-  socketUrl,
-  socketQuery,
   paramKey,
   paramValue,
   type,
@@ -44,15 +37,23 @@ export const ChatMessages = ({
   const { socket } = useSocket();
   const queryClient = useQueryClient();
 
-  const { data, fetchNextPage, hasNextPage, isFetchingNextPage, status } =
-    useMessages({
-      chatId,
-      apiUrl,
-      paramKey,
-      paramValue,
-    });
+  const {
+    data,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    isLoading,
+    isError,
+  } = useMessages({
+    chatId,
+    apiUrl,
+    paramKey,
+    paramValue,
+  });
 
-  const messages = data?.pages?.flatMap((page) => page.items) || [];
+  const messages: MessageWithUser[] =
+    data?.pages?.flatMap((page: { items: MessageWithUser[] }) => page.items) ||
+    [];
 
   useEffect(() => {
     if (!socket) {
@@ -65,26 +66,31 @@ export const ChatMessages = ({
     const channelKey = `chat:${chatId}:messages`;
 
     const messageHandler = (message: MessageWithUser) => {
-      queryClient.setQueryData(["messages", chatId], (oldData: any) => {
-        if (!oldData || !oldData.pages || oldData.pages.length === 0) {
-          return {
-            pages: [
-              {
-                items: [message],
-                nextCursor: null,
-              },
-            ],
+      queryClient.setQueryData(
+        ["messages", chatId],
+        (oldData: {
+          pages: { items: MessageWithUser[]; nextCursor: string | null }[];
+        }) => {
+          if (!oldData || !oldData.pages || oldData.pages.length === 0) {
+            return {
+              pages: [
+                {
+                  items: [message],
+                  nextCursor: null,
+                },
+              ],
+            };
+          }
+
+          const newData = { ...oldData };
+          newData.pages[0] = {
+            ...newData.pages[0],
+            items: [message, ...newData.pages[0].items],
           };
+
+          return newData;
         }
-
-        const newData = { ...oldData };
-        newData.pages[0] = {
-          ...newData.pages[0],
-          items: [message, ...newData.pages[0].items],
-        };
-
-        return newData;
-      });
+      );
 
       // Scroll to bottom when new message arrives
       setTimeout(() => {
@@ -105,9 +111,9 @@ export const ChatMessages = ({
     setTimeout(() => {
       bottomRef?.current?.scrollIntoView({ behavior: "smooth" });
     }, 100);
-  }, [messages]);
+  }, []);
 
-  if (status === "pending") {
+  if (isLoading) {
     return (
       <div className="flex flex-col flex-1 justify-center items-center">
         <Loader2 className="h-7 w-7 text-zinc-500 animate-spin my-4" />
@@ -118,7 +124,7 @@ export const ChatMessages = ({
     );
   }
 
-  if (status === "error") {
+  if (isError) {
     return (
       <div className="flex flex-col flex-1 justify-center items-center">
         <ServerCrash className="h-7 w-7 text-zinc-500 my-4" />

@@ -2,7 +2,7 @@
 
 import { Edit, Hash, Lock, Mic, Trash, Video } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
-import { Channel, ChannelType, MemberRole, Server } from "@/generated/prisma";
+import { Channel, ChannelType, MemberRole } from "@/generated/prisma";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,7 +14,6 @@ import {
 
 interface ServerChannelProps {
   channel: Channel;
-  server: Server;
   role?: MemberRole;
 }
 
@@ -24,11 +23,7 @@ const iconMap = {
   [ChannelType.VIDEO]: Video,
 };
 
-export const ServerChannel = ({
-  channel,
-  server,
-  role,
-}: ServerChannelProps) => {
+export const ServerChannel = ({ channel, role }: ServerChannelProps) => {
   const params = useParams();
   const router = useRouter();
 

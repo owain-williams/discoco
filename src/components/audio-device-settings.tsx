@@ -48,9 +48,30 @@ export const AudioDeviceSettings = () => {
   const audioManager = AudioDeviceManager.getInstance();
 
   useEffect(() => {
+    const loadDevices = async () => {
+      try {
+        const devices = await audioManager.getAvailableDevices();
+        setMicrophones(devices.microphones);
+        setSpeakers(devices.speakers);
+        setCameras(devices.cameras);
+      } catch {
+        console.error("Failed to load audio/video devices");
+      }
+    };
+
+    const loadSavedSelections = () => {
+      const savedMic = audioManager.getSelectedMicrophone();
+      const savedSpeaker = audioManager.getSelectedSpeaker();
+      const savedCamera = audioManager.getSelectedCamera();
+
+      if (savedMic) setSelectedMicrophone(savedMic);
+      if (savedSpeaker) setSelectedSpeaker(savedSpeaker);
+      if (savedCamera) setSelectedCamera(savedCamera);
+    };
+
     loadDevices();
     loadSavedSelections();
-  }, []);
+  }, [audioManager]);
 
   // Handle camera preview
   useEffect(() => {
@@ -60,12 +81,14 @@ export const AudioDeviceSettings = () => {
       if (showCameraPreview && selectedCamera) {
         try {
           stream = await audioManager.getCameraStream(selectedCamera);
-          const video = document.getElementById("camera-preview") as HTMLVideoElement;
+          const video = document.getElementById(
+            "camera-preview"
+          ) as HTMLVideoElement;
           if (video) {
             video.srcObject = stream;
           }
-        } catch (error) {
-          console.error("Error starting camera preview:", error);
+        } catch {
+          console.error("Error starting camera preview");
           setShowCameraPreview(false);
         }
       }
@@ -73,10 +96,12 @@ export const AudioDeviceSettings = () => {
 
     const stopCameraPreview = () => {
       if (stream) {
-        stream.getTracks().forEach(track => track.stop());
+        stream.getTracks().forEach((track) => track.stop());
         stream = null;
       }
-      const video = document.getElementById("camera-preview") as HTMLVideoElement;
+      const video = document.getElementById(
+        "camera-preview"
+      ) as HTMLVideoElement;
       if (video) {
         video.srcObject = null;
       }
@@ -91,28 +116,7 @@ export const AudioDeviceSettings = () => {
     return () => {
       stopCameraPreview();
     };
-  }, [showCameraPreview, selectedCamera]);
-
-  const loadDevices = async () => {
-    try {
-      const devices = await audioManager.getAvailableDevices();
-      setMicrophones(devices.microphones);
-      setSpeakers(devices.speakers);
-      setCameras(devices.cameras);
-    } catch (error) {
-      console.error("Failed to load audio/video devices:", error);
-    }
-  };
-
-  const loadSavedSelections = () => {
-    const savedMic = audioManager.getSelectedMicrophone();
-    const savedSpeaker = audioManager.getSelectedSpeaker();
-    const savedCamera = audioManager.getSelectedCamera();
-
-    if (savedMic) setSelectedMicrophone(savedMic);
-    if (savedSpeaker) setSelectedSpeaker(savedSpeaker);
-    if (savedCamera) setSelectedCamera(savedCamera);
-  };
+  }, [showCameraPreview, selectedCamera, audioManager]);
 
   const handleMicrophoneChange = (deviceId: string) => {
     setSelectedMicrophone(deviceId);
@@ -129,6 +133,27 @@ export const AudioDeviceSettings = () => {
     audioManager.setSelectedCamera(deviceId);
   };
 
+  const loadDevices = async () => {
+    try {
+      const devices = await audioManager.getAvailableDevices();
+      setMicrophones(devices.microphones);
+      setSpeakers(devices.speakers);
+      setCameras(devices.cameras);
+    } catch {
+      console.error("Failed to load audio/video devices");
+    }
+  };
+
+  const loadSavedSelections = () => {
+    const savedMic = audioManager.getSelectedMicrophone();
+    const savedSpeaker = audioManager.getSelectedSpeaker();
+    const savedCamera = audioManager.getSelectedCamera();
+
+    if (savedMic) setSelectedMicrophone(savedMic);
+    if (savedSpeaker) setSelectedSpeaker(savedSpeaker);
+    if (savedCamera) setSelectedCamera(savedCamera);
+  };
+
   const testMicrophone = async () => {
     if (!selectedMicrophone) return;
 
@@ -140,7 +165,7 @@ export const AudioDeviceSettings = () => {
           ? "Microphone test successful!"
           : "Microphone test failed. Check your device."
       );
-    } catch (error) {
+    } catch {
       alert("Microphone test failed. Check your device and permissions.");
     } finally {
       setTesting((prev) => ({ ...prev, mic: false }));
@@ -158,7 +183,7 @@ export const AudioDeviceSettings = () => {
           ? "Speaker test successful!"
           : "Speaker test failed. Check your device."
       );
-    } catch (error) {
+    } catch {
       alert("Speaker test failed. Check your device.");
     } finally {
       setTesting((prev) => ({ ...prev, speaker: false }));
@@ -176,7 +201,7 @@ export const AudioDeviceSettings = () => {
           ? "Camera test successful!"
           : "Camera test failed. Check your device."
       );
-    } catch (error) {
+    } catch {
       alert("Camera test failed. Check your device and permissions.");
     } finally {
       setTesting((prev) => ({ ...prev, camera: false }));

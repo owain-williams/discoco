@@ -2,14 +2,13 @@
 
 import { Crown, ShieldCheck } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
-import { Member, MemberRole, Server, User } from "@/generated/prisma";
+import { Member, MemberRole, User } from "@/generated/prisma";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 
 interface ServerMemberProps {
   member: Member & { user: User };
-  server: Server;
 }
 
 const roleIconMap = {
@@ -20,7 +19,7 @@ const roleIconMap = {
   [MemberRole.ADMIN]: <Crown className="h-4 w-4 ml-2 text-yellow-500" />,
 };
 
-export const ServerMember = ({ member, server }: ServerMemberProps) => {
+export const ServerMember = ({ member }: ServerMemberProps) => {
   const params = useParams();
   const router = useRouter();
 

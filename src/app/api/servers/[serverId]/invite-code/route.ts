@@ -6,16 +6,17 @@ import { MemberRole } from "@/generated/prisma";
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { serverId: string } }
+  { params }: { params: Promise<{ serverId: string }> }
 ) {
   try {
+    const { serverId } = await params;
     const user = await currentUser();
 
     if (!user) {
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
-    if (!params.serverId) {
+    if (!serverId) {
       return new NextResponse("Server ID missing", { status: 400 });
     }
 
@@ -39,7 +40,7 @@ export async function PATCH(
 
     const server = await db.server.update({
       where: {
-        id: params.serverId,
+        id: serverId,
         members: {
           some: {
             userId: dbUser.id,

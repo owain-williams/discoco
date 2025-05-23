@@ -107,7 +107,11 @@ export async function POST(req: Request) {
         },
       },
       include: {
-        members: true,
+        members: {
+          include: {
+            user: true,
+          },
+        },
       },
     });
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Mic,
   MicOff,
@@ -49,7 +49,6 @@ export const VoiceChannel = ({
   const [voiceUsers, setVoiceUsers] = useState<VoiceUser[]>([]);
   const [mediaStream, setMediaStream] = useState<MediaStream | null>(null);
   const voiceManagerRef = useRef<VoiceManager | null>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioDeviceManager = AudioDeviceManager.getInstance();
 
   // Connect to voice channel
@@ -94,7 +93,7 @@ export const VoiceChannel = ({
   };
 
   // Disconnect from voice channel
-  const disconnectFromVoice = () => {
+  const disconnectFromVoice = useCallback(() => {
     if (mediaStream) {
       mediaStream.getTracks().forEach((track) => track.stop());
       setMediaStream(null);
@@ -117,7 +116,7 @@ export const VoiceChannel = ({
         userId: currentMember.user.id,
       });
     }
-  };
+  }, [mediaStream, socket, currentMember.user.id, channelId, serverId]);
 
   // Toggle mute
   const toggleMute = () => {
@@ -212,7 +211,7 @@ export const VoiceChannel = ({
         voiceManagerRef.current.cleanup();
       }
     };
-  }, [isConnected]);
+  }, [isConnected, disconnectFromVoice]);
 
   return (
     <div className="flex flex-col h-full">
@@ -270,7 +269,7 @@ export const VoiceChannel = ({
       {/* Voice Controls */}
       <div className="p-4 border-t border-neutral-200 dark:border-neutral-800">
         {!isConnected ? (
-          <Button onClick={connectToVoice} className="w-full" variant="primary">
+          <Button onClick={connectToVoice} className="w-full" variant="default">
             <Volume2 className="w-4 h-4 mr-2" />
             Join Voice Channel
           </Button>

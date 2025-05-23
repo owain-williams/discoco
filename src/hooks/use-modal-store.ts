@@ -6,6 +6,7 @@ export type ModalType =
   | "createChannel"
   | "inviteServer"
   | "joinServer"
+  | "messageFile"
   | "settings";
 
 interface ModalData {
@@ -16,6 +17,8 @@ interface ModalData {
     imageUrl: string | null;
     inviteCode: string;
   };
+  apiUrl?: string;
+  query?: Record<string, string>;
 }
 
 interface ModalStore {

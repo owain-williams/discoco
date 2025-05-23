@@ -22,6 +22,53 @@ export const AudioVolumeIndicator = ({
   const audioManager = AudioDeviceManager.getInstance();
 
   useEffect(() => {
+    const monitorVolume = () => {
+      if (!analyserRef.current) return;
+
+      const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
+      analyserRef.current.getByteFrequencyData(dataArray);
+
+      // Calculate average volume
+      const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
+      const normalizedVolume = Math.min(average / 128, 1); // Normalize to 0-1
+
+      setVolume(normalizedVolume);
+
+      // Continue monitoring
+      animationRef.current = requestAnimationFrame(monitorVolume);
+    };
+
+    const startListening = async () => {
+      try {
+        setIsListening(true);
+
+        // Get microphone stream
+        const stream = deviceId
+          ? await audioManager.getMicrophoneStream(deviceId)
+          : await navigator.mediaDevices.getUserMedia({ audio: true });
+
+        streamRef.current = stream;
+
+        // Set up audio context and analyser
+        const audioContext = new AudioContext();
+        const analyser = audioContext.createAnalyser();
+        const source = audioContext.createMediaStreamSource(stream);
+
+        analyser.fftSize = 256;
+        analyser.smoothingTimeConstant = 0.8;
+        source.connect(analyser);
+
+        audioContextRef.current = audioContext;
+        analyserRef.current = analyser;
+
+        // Start volume monitoring
+        monitorVolume();
+      } catch (error) {
+        console.error("Error starting volume monitoring:", error);
+        setIsListening(false);
+      }
+    };
+
     if (isActive && deviceId) {
       startListening();
     } else {
@@ -31,38 +78,7 @@ export const AudioVolumeIndicator = ({
     return () => {
       stopListening();
     };
-  }, [isActive, deviceId]);
-
-  const startListening = async () => {
-    try {
-      setIsListening(true);
-
-      // Get microphone stream
-      const stream = deviceId
-        ? await audioManager.getMicrophoneStream(deviceId)
-        : await navigator.mediaDevices.getUserMedia({ audio: true });
-
-      streamRef.current = stream;
-
-      // Set up audio context and analyser
-      const audioContext = new AudioContext();
-      const analyser = audioContext.createAnalyser();
-      const source = audioContext.createMediaStreamSource(stream);
-
-      analyser.fftSize = 256;
-      analyser.smoothingTimeConstant = 0.8;
-      source.connect(analyser);
-
-      audioContextRef.current = audioContext;
-      analyserRef.current = analyser;
-
-      // Start volume monitoring
-      monitorVolume();
-    } catch (error) {
-      console.error("Error starting volume monitoring:", error);
-      setIsListening(false);
-    }
-  };
+  }, [isActive, deviceId, audioManager]);
 
   const stopListening = () => {
     setIsListening(false);
@@ -87,22 +103,6 @@ export const AudioVolumeIndicator = ({
     }
 
     analyserRef.current = null;
-  };
-
-  const monitorVolume = () => {
-    if (!analyserRef.current) return;
-
-    const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
-    analyserRef.current.getByteFrequencyData(dataArray);
-
-    // Calculate average volume
-    const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
-    const normalizedVolume = Math.min(average / 128, 1); // Normalize to 0-1
-
-    setVolume(normalizedVolume);
-
-    // Continue monitoring
-    animationRef.current = requestAnimationFrame(monitorVolume);
   };
 
   return (

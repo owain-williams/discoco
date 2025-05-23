@@ -5,16 +5,17 @@ import { MemberRole } from "@/generated/prisma";
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { inviteCode: string } }
+  { params }: { params: Promise<{ inviteCode: string }> }
 ) {
   try {
+    const { inviteCode } = await params;
     const user = await currentUser();
 
     if (!user) {
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
-    if (!params.inviteCode) {
+    if (!inviteCode) {
       return new NextResponse("Invite code missing", { status: 400 });
     }
 
@@ -39,7 +40,7 @@ export async function POST(
     // Check if the server exists and user is not already a member
     const existingServer = await db.server.findFirst({
       where: {
-        inviteCode: params.inviteCode,
+        inviteCode: inviteCode,
         members: {
           some: {
             userId: dbUser.id,
@@ -55,7 +56,7 @@ export async function POST(
     // Add user to the server
     const server = await db.server.update({
       where: {
-        inviteCode: params.inviteCode,
+        inviteCode: inviteCode,
       },
       data: {
         members: {

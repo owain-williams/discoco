@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import {
   Mic,
   MicOff,
@@ -116,7 +116,7 @@ export const VideoChannel = ({
   };
 
   // Disconnect from video channel
-  const disconnectFromVideo = () => {
+  const disconnectFromVideo = useCallback(() => {
     if (mediaStream) {
       mediaStream.getTracks().forEach((track) => track.stop());
       setMediaStream(null);
@@ -140,7 +140,7 @@ export const VideoChannel = ({
         userId: currentMember.user.id,
       });
     }
-  };
+  }, [mediaStream, socket, currentMember.user.id, channelId, serverId]);
 
   // Toggle mute
   const toggleMute = () => {
@@ -269,7 +269,7 @@ export const VideoChannel = ({
         videoManagerRef.current.cleanup();
       }
     };
-  }, [isConnected]);
+  }, [isConnected, disconnectFromVideo]);
 
   // Handle local video stream updates
   useEffect(() => {

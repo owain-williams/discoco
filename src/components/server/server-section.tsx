@@ -16,10 +16,6 @@ interface ServerSectionProps {
   role?: MemberRole;
   sectionType: "channels" | "members";
   channelType?: ChannelType;
-  server?: {
-    id: string;
-    name: string;
-  };
 }
 
 export const ServerSection = ({
@@ -27,7 +23,6 @@ export const ServerSection = ({
   role,
   sectionType,
   channelType,
-  server,
 }: ServerSectionProps) => {
   const { onOpen } = useModal();
 

@@ -9,13 +9,14 @@ import { VoiceChannel } from "@/components/voice/voice-channel";
 import { VideoChannel } from "@/components/voice/video-channel";
 
 interface ChannelIdPageProps {
-  params: {
+  params: Promise<{
     serverId: string;
     channelId: string;
-  };
+  }>;
 }
 
 const ChannelIdPage = async ({ params }: ChannelIdPageProps) => {
+  const { serverId, channelId } = await params;
   const user = await currentUser();
 
   if (!user) {
@@ -24,13 +25,13 @@ const ChannelIdPage = async ({ params }: ChannelIdPageProps) => {
 
   const channel = await db.channel.findUnique({
     where: {
-      id: params.channelId,
+      id: channelId,
     },
   });
 
   const member = await db.member.findFirst({
     where: {
-      serverId: params.serverId,
+      serverId: serverId,
       user: {
         clerkId: user.id,
       },

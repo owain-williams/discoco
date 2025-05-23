@@ -1,18 +1,18 @@
 "use client";
 
-import { Plus, Send } from "lucide-react";
+import * as z from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
-import { Form, FormControl, FormField, FormItem } from "@/components/ui/form";
+import { Plus } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { useSocket } from "@/components/providers/socket-provider";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { Form, FormControl, FormField, FormItem } from "@/components/ui/form";
+import { useModal } from "@/hooks/use-modal-store";
+import { useSendMessage } from "@/hooks/use-messages";
 
 interface ChatInputProps {
   apiUrl: string;
-  query: Record<string, any>;
+  query: Record<string, string>;
   name: string;
   type: "conversation" | "channel";
   chatId: string;
@@ -29,8 +29,7 @@ export const ChatInput = ({
   type,
   chatId,
 }: ChatInputProps) => {
-  const { socket } = useSocket();
-  const queryClient = useQueryClient();
+  const { onOpen } = useModal();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -39,37 +38,25 @@ export const ChatInput = ({
     },
   });
 
-  const { mutate: sendMessage, isPending } = useMutation({
-    mutationFn: async (values: z.infer<typeof formSchema>) => {
-      const url = new URL(apiUrl, window.location.origin);
-      Object.entries(query).forEach(([key, value]) => {
-        url.searchParams.set(key, value);
-      });
-
-      const response = await fetch(url.toString(), {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(values),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to send message");
-      }
-
-      return response.json();
-    },
-    onSuccess: () => {
-      form.reset();
-      queryClient.invalidateQueries({ queryKey: ["messages", chatId] });
-    },
+  const { mutate: sendMessage, isPending } = useSendMessage({
+    apiUrl,
+    chatId,
   });
 
   const isLoading = form.formState.isSubmitting || isPending;
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
-    sendMessage(values);
+    try {
+      const url = new URL(apiUrl, window.location.origin);
+      Object.entries(query).forEach(([key, value]) => {
+        url.searchParams.set(key, value);
+      });
+
+      sendMessage(values);
+      form.reset();
+    } catch (error: unknown) {
+      console.log(error);
+    }
   };
 
   return (
@@ -82,15 +69,13 @@ export const ChatInput = ({
             <FormItem>
               <FormControl>
                 <div className="relative p-4 pb-6">
-                  <Button
+                  <button
                     type="button"
-                    onClick={() => {}}
-                    size="icon"
-                    variant="outline"
+                    onClick={() => onOpen("messageFile", { apiUrl, query })}
                     className="absolute top-7 left-8 h-[24px] w-[24px] bg-zinc-500 dark:bg-zinc-400 hover:bg-zinc-600 dark:hover:bg-zinc-300 transition rounded-full p-1 flex items-center justify-center"
                   >
                     <Plus className="text-white dark:text-[#313338]" />
-                  </Button>
+                  </button>
                   <Input
                     disabled={isLoading}
                     className="px-14 py-6 bg-zinc-200/90 dark:bg-zinc-700/75 border-none border-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-zinc-600 dark:text-zinc-200"
@@ -103,10 +88,10 @@ export const ChatInput = ({
                     <Button
                       disabled={isLoading}
                       type="submit"
-                      size="icon"
                       variant="ghost"
+                      size="icon"
                     >
-                      <Send className="h-4 w-4" />
+                      Send
                     </Button>
                   </div>
                 </div>

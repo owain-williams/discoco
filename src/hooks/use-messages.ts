@@ -3,33 +3,27 @@ import {
   useMutation,
   useQueryClient,
 } from "@tanstack/react-query";
+import { Message, User } from "@/generated/prisma";
 
-// Interface for message data structure (for future use)
-export interface Message {
-  id: string;
-  content: string;
-  fileUrl?: string;
-  createdAt: string;
-  updatedAt: string;
-  member: {
-    id: string;
-    role: string;
-    user: {
-      id: string;
-      username: string;
-      imageUrl?: string;
-    };
-  };
-}
+// Type for message with user relation
+export type MessageWithUser = Message & {
+  user: User;
+};
+
+// Type for the API response
+export type MessagesResponse = {
+  items: MessageWithUser[];
+  nextCursor: string | null;
+};
 
 const fetchMessages = async ({
   pageParam = undefined,
   chatId,
 }: {
-  pageParam?: string;
+  pageParam?: string | null;
   chatId: string;
   apiUrl: string;
-}) => {
+}): Promise<MessagesResponse> => {
   const url = new URL("/api/messages", window.location.origin);
   url.searchParams.set("chatId", chatId);
   if (pageParam) {
@@ -74,11 +68,16 @@ export const useMessages = ({
   paramKey: "channelId" | "conversationId";
   paramValue: string;
 }) => {
-  return useInfiniteQuery({
+  return useInfiniteQuery<MessagesResponse>({
     queryKey: ["messages", chatId],
     queryFn: ({ pageParam }) =>
-      fetchMessages({ pageParam, chatId, apiUrl: "" }),
+      fetchMessages({
+        pageParam: pageParam as string | undefined,
+        chatId,
+        apiUrl: "",
+      }),
     getNextPageParam: (lastPage) => lastPage?.nextCursor,
+    initialPageParam: null,
     refetchInterval: 1000, // Refetch every second for real-time effect
     enabled: !!chatId,
   });

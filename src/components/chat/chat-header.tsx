@@ -11,12 +11,7 @@ interface ChatHeaderProps {
   imageUrl?: string;
 }
 
-export const ChatHeader = ({
-  serverId,
-  name,
-  type,
-  imageUrl,
-}: ChatHeaderProps) => {
+export const ChatHeader = ({ name, type, imageUrl }: ChatHeaderProps) => {
   const { isConnected } = useSocket();
 
   return (

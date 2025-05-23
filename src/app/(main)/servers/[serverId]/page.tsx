@@ -3,12 +3,13 @@ import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 
 interface ServerIdPageProps {
-  params: {
+  params: Promise<{
     serverId: string;
-  };
+  }>;
 }
 
 const ServerIdPage = async ({ params }: ServerIdPageProps) => {
+  const { serverId } = await params;
   const user = await currentUser();
 
   if (!user) {
@@ -17,7 +18,7 @@ const ServerIdPage = async ({ params }: ServerIdPageProps) => {
 
   const server = await db.server.findUnique({
     where: {
-      id: params.serverId,
+      id: serverId,
       members: {
         some: {
           user: {
@@ -44,7 +45,7 @@ const ServerIdPage = async ({ params }: ServerIdPageProps) => {
     return null;
   }
 
-  return redirect(`/servers/${params.serverId}/channels/${initialChannel?.id}`);
+  return redirect(`/servers/${serverId}/channels/${initialChannel?.id}`);
 };
 
 export default ServerIdPage;

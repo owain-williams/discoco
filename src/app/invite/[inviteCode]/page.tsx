@@ -3,19 +3,20 @@ import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 
 interface InviteCodePageProps {
-  params: {
+  params: Promise<{
     inviteCode: string;
-  };
+  }>;
 }
 
 const InviteCodePage = async ({ params }: InviteCodePageProps) => {
+  const { inviteCode } = await params;
   const user = await currentUser();
 
   if (!user) {
     return redirect("/sign-in");
   }
 
-  if (!params.inviteCode) {
+  if (!inviteCode) {
     return redirect("/");
   }
 
@@ -40,7 +41,7 @@ const InviteCodePage = async ({ params }: InviteCodePageProps) => {
   // Check if the user is already a member of the server
   const existingServer = await db.server.findFirst({
     where: {
-      inviteCode: params.inviteCode,
+      inviteCode: inviteCode,
       members: {
         some: {
           userId: dbUser.id,
@@ -56,7 +57,7 @@ const InviteCodePage = async ({ params }: InviteCodePageProps) => {
   // Find the server with the invite code
   const server = await db.server.findUnique({
     where: {
-      inviteCode: params.inviteCode,
+      inviteCode: inviteCode,
     },
   });
 
