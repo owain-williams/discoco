@@ -19,7 +19,10 @@ export class AudioDeviceManager {
   private selectedCameraId: string | null = null;
 
   constructor() {
-    this.loadSavedDevices();
+    // Only load saved devices if we're in the browser
+    if (typeof window !== "undefined") {
+      this.loadSavedDevices();
+    }
   }
 
   static getInstance(): AudioDeviceManager {
@@ -91,17 +94,23 @@ export class AudioDeviceManager {
 
   setSelectedMicrophone(deviceId: string) {
     this.selectedMicrophoneId = deviceId;
-    localStorage.setItem("selected-microphone", deviceId);
+    if (typeof window !== "undefined" && window.localStorage) {
+      localStorage.setItem("selected-microphone", deviceId);
+    }
   }
 
   setSelectedSpeaker(deviceId: string) {
     this.selectedSpeakerId = deviceId;
-    localStorage.setItem("selected-speaker", deviceId);
+    if (typeof window !== "undefined" && window.localStorage) {
+      localStorage.setItem("selected-speaker", deviceId);
+    }
   }
 
   setSelectedCamera(deviceId: string) {
     this.selectedCameraId = deviceId;
-    localStorage.setItem("selected-camera", deviceId);
+    if (typeof window !== "undefined" && window.localStorage) {
+      localStorage.setItem("selected-camera", deviceId);
+    }
   }
 
   getSelectedMicrophone(): string | null {
@@ -140,9 +149,12 @@ export class AudioDeviceManager {
   }
 
   private loadSavedDevices() {
-    this.selectedMicrophoneId = localStorage.getItem("selected-microphone");
-    this.selectedSpeakerId = localStorage.getItem("selected-speaker");
-    this.selectedCameraId = localStorage.getItem("selected-camera");
+    // Check if we're in the browser environment
+    if (typeof window !== "undefined" && window.localStorage) {
+      this.selectedMicrophoneId = localStorage.getItem("selected-microphone");
+      this.selectedSpeakerId = localStorage.getItem("selected-speaker");
+      this.selectedCameraId = localStorage.getItem("selected-camera");
+    }
   }
 
   // Test audio functionality
@@ -263,9 +275,32 @@ export class AudioDeviceManager {
     audioDeviceId?: string,
     videoDeviceId?: string
   ): Promise<MediaStream> {
+    // Use more flexible constraints to avoid OverconstrainedError
     const constraints: MediaStreamConstraints = {
-      audio: audioDeviceId ? { deviceId: { exact: audioDeviceId } } : true,
-      video: videoDeviceId ? { deviceId: { exact: videoDeviceId } } : true,
+      audio: audioDeviceId
+        ? {
+            deviceId: { ideal: audioDeviceId },
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          }
+        : {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          },
+      video: videoDeviceId
+        ? {
+            deviceId: { ideal: videoDeviceId },
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+            frameRate: { ideal: 30 },
+          }
+        : {
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+            frameRate: { ideal: 30 },
+          },
     };
 
     console.log("getAudioVideoStream constraints:", constraints);
@@ -278,7 +313,24 @@ export class AudioDeviceManager {
       return stream;
     } catch (error) {
       console.error("Error getting audio/video stream:", error);
-      throw error;
+
+      // Fallback to basic constraints if the ideal ones fail
+      console.log("Trying fallback constraints...");
+      try {
+        const fallbackConstraints: MediaStreamConstraints = {
+          audio: true,
+          video: true,
+        };
+
+        const fallbackStream = await navigator.mediaDevices.getUserMedia(
+          fallbackConstraints
+        );
+        console.log("Fallback stream successful:", fallbackStream);
+        return fallbackStream;
+      } catch (fallbackError) {
+        console.error("Fallback constraints also failed:", fallbackError);
+        throw fallbackError;
+      }
     }
   }
 

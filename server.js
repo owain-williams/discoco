@@ -14,7 +14,7 @@ app.prepare().then(() => {
   const httpServer = createServer(handler);
 
   const io = new Server(httpServer, {
-    path: "/api/socket/io",
+    path: "/socket.io/",
     addTrailingSlash: false,
     cors: {
       origin: "*",
@@ -23,7 +23,21 @@ app.prepare().then(() => {
   });
 
   io.on("connection", (socket) => {
-    console.log("Socket connected:", socket.id);
+    console.log("🔌 Socket connected:", socket.id);
+
+    // Enhanced logging to catch all events
+    socket.onAny((eventName, ...args) => {
+      console.log(`🎯 Event received: ${eventName}`, args);
+    });
+
+    // Test event handler to verify communication
+    socket.on("test-video-event", (data) => {
+      console.log("🧪 TEST EVENT RECEIVED:", data);
+      socket.emit("test-response", {
+        message: "Server received test event",
+        data,
+      });
+    });
 
     // Text channel events
     socket.on("join-channel", (channelId) => {
@@ -104,58 +118,106 @@ app.prepare().then(() => {
       const { channelId, serverId, user } = data;
       const videoRoomKey = `video:${channelId}`;
 
-      socket.join(videoRoomKey);
+      console.log(
+        `🎥 Socket ${socket.id} joining video channel ${channelId} with user:`,
+        user
+      );
+
+      // Set socket properties BEFORE joining room
       socket.videoChannelId = channelId;
       socket.videoUserId = user.id;
+      socket.videoUser = user;
 
-      console.log(`Socket ${socket.id} joined video channel ${channelId}`);
+      socket.join(videoRoomKey);
 
-      // Notify others in the video channel
-      socket.to(videoRoomKey).emit("video-user-joined", user);
+      console.log(`✅ Socket ${socket.id} joined video channel ${channelId}`);
+
+      // Get current room state before notifying
+      const roomSockets = io.sockets.adapter.rooms.get(videoRoomKey);
+      console.log(
+        `👥 Room ${videoRoomKey} now has ${
+          roomSockets ? roomSockets.size : 0
+        } sockets total`
+      );
 
       // Send current video users to the newly joined user
       const videoUsers = [];
-      const roomSockets = io.sockets.adapter.rooms.get(videoRoomKey);
+
       if (roomSockets) {
+        console.log(`🔍 Checking all sockets in room ${videoRoomKey}:`);
         roomSockets.forEach((socketId) => {
           const roomSocket = io.sockets.sockets.get(socketId);
+          console.log(`  - Socket ${socketId}:`, {
+            hasSocket: !!roomSocket,
+            hasVideoUser: !!roomSocket?.videoUser,
+            videoUser: roomSocket?.videoUser,
+            isNotSelf: socketId !== socket.id,
+          });
+
           if (roomSocket && roomSocket.videoUser && socketId !== socket.id) {
+            console.log(`✅ Found existing video user:`, roomSocket.videoUser);
             videoUsers.push(roomSocket.videoUser);
           }
         });
       }
 
-      socket.videoUser = user;
+      console.log(
+        `📋 Sending ${videoUsers.length} existing video users to socket ${socket.id}:`,
+        videoUsers
+      );
       socket.emit("video-channel-users", videoUsers);
+
+      // Notify others in the video channel about the new user
+      console.log(
+        `📢 Notifying ${
+          roomSockets ? roomSockets.size - 1 : 0
+        } other sockets in room ${videoRoomKey} about new user:`,
+        user
+      );
+      socket.to(videoRoomKey).emit("video-user-joined", user);
+
+      console.log(`🎥 Video channel join complete for ${socket.id}`);
     });
 
     socket.on("leave-video-channel", (data) => {
       const { channelId, userId } = data;
       const videoRoomKey = `video:${channelId}`;
 
+      console.log(`🚪 Socket ${socket.id} leaving video channel ${channelId}`);
+
       socket.leave(videoRoomKey);
-      console.log(`Socket ${socket.id} left video channel ${channelId}`);
 
       // Notify others in the video channel
+      console.log(`📢 Notifying others that user ${userId} left video channel`);
       socket.to(videoRoomKey).emit("video-user-left", userId);
 
       socket.videoChannelId = null;
       socket.videoUserId = null;
       socket.videoUser = null;
+
+      console.log(`✅ Socket ${socket.id} left video channel ${channelId}`);
     });
 
     socket.on("video-state-update", (data) => {
       const { channelId, userId, isMuted, isDeafened, hasVideo } = data;
       const videoRoomKey = `video:${channelId}`;
 
+      console.log(`🔄 Video state update for user ${userId}:`, {
+        isMuted,
+        isDeafened,
+        hasVideo,
+      });
+
       // Update socket's video user state
       if (socket.videoUser) {
         socket.videoUser.isMuted = isMuted;
         socket.videoUser.isDeafened = isDeafened;
         socket.videoUser.hasVideo = hasVideo;
+        console.log(`✅ Updated socket ${socket.id} video user state`);
       }
 
       // Broadcast state update to others in the video channel
+      console.log(`📢 Broadcasting state update to room ${videoRoomKey}`);
       socket.to(videoRoomKey).emit("video-state-update", {
         userId,
         isMuted,
@@ -328,17 +390,23 @@ app.prepare().then(() => {
     });
 
     socket.on("disconnect", () => {
-      console.log("Socket disconnected:", socket.id);
+      console.log("🔌 Socket disconnected:", socket.id);
 
       // Handle voice channel cleanup
       if (socket.voiceChannelId && socket.voiceUserId) {
         const voiceRoomKey = `voice:${socket.voiceChannelId}`;
+        console.log(
+          `🎙️ Cleaning up voice channel ${socket.voiceChannelId} for user ${socket.voiceUserId}`
+        );
         socket.to(voiceRoomKey).emit("voice-user-left", socket.voiceUserId);
       }
 
       // Handle video channel cleanup
       if (socket.videoChannelId && socket.videoUserId) {
         const videoRoomKey = `video:${socket.videoChannelId}`;
+        console.log(
+          `🎥 Cleaning up video channel ${socket.videoChannelId} for user ${socket.videoUserId}`
+        );
         socket.to(videoRoomKey).emit("video-user-left", socket.videoUserId);
       }
     });

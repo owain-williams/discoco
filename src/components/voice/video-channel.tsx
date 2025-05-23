@@ -46,7 +46,7 @@ export const VideoChannel = ({
   currentMember,
   serverId,
 }: VideoChannelProps) => {
-  const { socket } = useSocket();
+  const { socket, isConnected: socketConnected } = useSocket();
   const { onOpen } = useModal();
   const [isConnected, setIsConnected] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
@@ -57,10 +57,30 @@ export const VideoChannel = ({
   const [mediaStream, setMediaStream] = useState<MediaStream | null>(null);
   const videoManagerRef = useRef<VideoManager | null>(null);
   const localVideoRef = useRef<HTMLVideoElement>(null);
-  const audioDeviceManager = AudioDeviceManager.getInstance();
+  const [audioDeviceManager, setAudioDeviceManager] =
+    useState<AudioDeviceManager | null>(null);
+
+  // Initialize AudioDeviceManager on client side only
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setAudioDeviceManager(AudioDeviceManager.getInstance());
+    }
+  }, []);
 
   // Connect to video channel
   const connectToVideo = async () => {
+    if (!socket || !socketConnected) {
+      console.error("Socket not connected, cannot join video channel");
+      return;
+    }
+
+    if (!audioDeviceManager) {
+      console.error(
+        "AudioDeviceManager not initialized, cannot join video channel"
+      );
+      return;
+    }
+
     try {
       // Use selected microphone and camera or defaults
       const selectedMic = audioDeviceManager.getSelectedMicrophone();
@@ -84,32 +104,48 @@ export const VideoChannel = ({
       console.log("Local video ref:", localVideoRef.current);
 
       // Initialize WebRTC video manager
-      if (socket) {
-        videoManagerRef.current = new VideoManager(
-          socket,
-          currentMember.user.id
-        );
-        await videoManagerRef.current.joinVideoChannel(
-          channelId,
-          stream,
-          isVideoEnabled
-        );
+      videoManagerRef.current = new VideoManager(socket, currentMember.user.id);
+      await videoManagerRef.current.joinVideoChannel(
+        channelId,
+        stream,
+        isVideoEnabled
+      );
 
-        // Also join regular video channel for UI updates
-        socket.emit("join-video-channel", {
-          channelId,
-          serverId,
-          user: {
-            id: currentMember.user.id,
-            username: currentMember.user.username,
-            imageUrl: currentMember.user.imageUrl,
-            isMuted: false,
-            isDeafened: false,
-            isSpeaking: false,
-            hasVideo: isVideoEnabled,
-          },
-        });
-      }
+      // Also join regular video channel for UI updates
+      socket.emit("join-video-channel", {
+        channelId,
+        serverId,
+        user: {
+          id: currentMember.user.id,
+          username: currentMember.user.username,
+          imageUrl: currentMember.user.imageUrl,
+          isMuted: false,
+          isDeafened: false,
+          isSpeaking: false,
+          hasVideo: isVideoEnabled,
+        },
+      });
+
+      // Test event to verify server communication
+      socket.emit("test-video-event", {
+        message: "Testing video channel communication",
+        userId: currentMember.user.id,
+        channelId: channelId,
+      });
+
+      console.log("Emitted join-video-channel event:", {
+        channelId,
+        serverId,
+        user: {
+          id: currentMember.user.id,
+          username: currentMember.user.username,
+          imageUrl: currentMember.user.imageUrl,
+          isMuted: false,
+          isDeafened: false,
+          isSpeaking: false,
+          hasVideo: isVideoEnabled,
+        },
+      });
     } catch (error) {
       console.error("Error accessing camera/microphone:", error);
     }
@@ -212,13 +248,51 @@ export const VideoChannel = ({
 
   // Socket event listeners
   useEffect(() => {
-    if (!socket) return;
+    if (!socket || !socketConnected) {
+      console.log("Socket not available or not connected, waiting...");
+      return;
+    }
+
+    console.log("Setting up video channel socket listeners...");
+
+    // Re-join channel when socket reconnects (if we were previously connected)
+    const handleReconnect = () => {
+      if (isConnected && socketConnected) {
+        console.log("Socket reconnected, re-joining video channel...");
+        socket.emit("join-video-channel", {
+          channelId,
+          serverId,
+          user: {
+            id: currentMember.user.id,
+            username: currentMember.user.username,
+            imageUrl: currentMember.user.imageUrl,
+            isMuted,
+            isDeafened,
+            isSpeaking: false,
+            hasVideo: isVideoEnabled,
+          },
+        });
+      }
+    };
+
+    socket.on("connect", handleReconnect);
+
+    // Test event to check if socket is working
+    socket.on("test-event", (data) => {
+      console.log("Test event received:", data);
+    });
+
+    socket.on("test-response", (data) => {
+      console.log("🧪 TEST RESPONSE RECEIVED:", data);
+    });
 
     const handleVideoUserJoined = (user: VideoUser) => {
+      console.log("🎯 Video user joined:", user);
       setVideoUsers((prev) => [...prev.filter((u) => u.id !== user.id), user]);
     };
 
     const handleVideoUserLeft = (userId: string) => {
+      console.log("🚪 Video user left:", userId);
       setVideoUsers((prev) => prev.filter((u) => u.id !== userId));
     };
 
@@ -228,6 +302,7 @@ export const VideoChannel = ({
       isDeafened: boolean;
       hasVideo: boolean;
     }) => {
+      console.log("🔄 Video state update:", data);
       setVideoUsers((prev) =>
         prev.map((user) =>
           user.id === data.userId
@@ -243,6 +318,8 @@ export const VideoChannel = ({
     };
 
     const handleVideoChannelUsers = (users: VideoUser[]) => {
+      console.log("📋 Video channel users received:", users);
+      console.log("📊 Current user count:", users.length);
       setVideoUsers(users);
     };
 
@@ -252,12 +329,26 @@ export const VideoChannel = ({
     socket.on("video-channel-users", handleVideoChannelUsers);
 
     return () => {
+      socket.off("connect", handleReconnect);
       socket.off("video-user-joined", handleVideoUserJoined);
       socket.off("video-user-left", handleVideoUserLeft);
       socket.off("video-state-update", handleVideoStateUpdate);
       socket.off("video-channel-users", handleVideoChannelUsers);
+      socket.off("test-event");
     };
-  }, [socket]);
+  }, [
+    socket,
+    socketConnected,
+    isConnected,
+    channelId,
+    serverId,
+    currentMember.user.id,
+    currentMember.user.username,
+    currentMember.user.imageUrl,
+    isMuted,
+    isDeafened,
+    isVideoEnabled,
+  ]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -269,7 +360,7 @@ export const VideoChannel = ({
         videoManagerRef.current.cleanup();
       }
     };
-  }, [isConnected, disconnectFromVideo]);
+  }, []);
 
   // Handle local video stream updates
   useEffect(() => {
@@ -321,6 +412,17 @@ export const VideoChannel = ({
             <h2 className="font-semibold text-lg">{channelName}</h2>
             <Users className="w-4 h-4 text-zinc-500 ml-2" />
             <span className="text-sm text-zinc-500">{totalUsers}</span>
+            {/* Connection status indicator */}
+            <div className="flex items-center gap-1 ml-2">
+              <div
+                className={`w-2 h-2 rounded-full ${
+                  socketConnected ? "bg-green-500" : "bg-red-500"
+                }`}
+              />
+              <span className="text-xs text-zinc-500">
+                {socketConnected ? "Connected" : "Disconnected"}
+              </span>
+            </div>
           </div>
           <Button onClick={toggleFullscreen} size="sm" variant="ghost">
             <Maximize2 className="w-4 h-4" />
@@ -500,9 +602,18 @@ export const VideoChannel = ({
         )}
       >
         {!isConnected ? (
-          <Button onClick={connectToVideo} className="w-full" variant="default">
+          <Button
+            onClick={connectToVideo}
+            className="w-full"
+            variant="default"
+            disabled={!socketConnected || !audioDeviceManager}
+          >
             <Video className="w-4 h-4 mr-2" />
-            Join Video Channel
+            {!socketConnected
+              ? "Connecting..."
+              : !audioDeviceManager
+              ? "Loading..."
+              : "Join Video Channel"}
           </Button>
         ) : (
           <div
